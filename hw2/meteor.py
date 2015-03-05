@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 import argparse # optparse is deprecated
 from itertools import islice # slicing for iterators
- 
+from nltk.stem import *
+from nltk.stem.porter import *
+from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
+import re
 # DRY
 
 
-class WordwithIndex(object):
-    def __init__(self,s,index):
-        self.s =s 
-        self.index = index
         
 def word_matches(h, ref):
     return sum(1 for w in h if w in ref)
@@ -16,13 +16,19 @@ def word_matches(h, ref):
     # or sum(map(ref.__contains__, h)) # ugly!
 
 def match(w1, w2):
+    #stemmer = SnowballStemmer("english")
+    #w1=re.sub(r'[\x00-\xff]','',w1)
+    #w2=re.sub(r'[\x00-\xff]','',w2)
+    #return stemmer.stem(w1)==stemmer.stem(w2)
     return w1==w2
-    
 def meteor_score(h, ref):
-    for w in h:
-        w = w.lower()
-    for w in ref:
-        w = w.lower()
+    for i in xrange(len(h)):
+        h[i]=h[i].lower()
+    for i in xrange(len(ref)):
+        ref[i]=ref[i].lower()
+    #print "CURRENT PAIR: "
+    #print h
+    #print ref
     len_h = len(h)
     len_ref = len(ref)
     h_buf = []
@@ -93,25 +99,27 @@ def main():
  
     # we create a generator and avoid loading all sentences into a list
     def sentences():
+        tokenizer = RegexpTokenizer(r'\w+')
         with open(opts.input) as f:
             for pair in f:
-                yield [sentence.strip().split() for sentence in pair.split(' ||| ')]
+	        #yield [tokenizer.tokenize(sentence.replace('"',' ')) for sentence in pair.split(' ||| ')]
+                yield [sentence.replace('"'," ").strip().split() for sentence in pair.split(' ||| ')]
  
     # note: the -n option does not work in the original code
     
-    #ref='the Iraqi weapons are to be handed over to the army within two weeks'.lower().split()
+    #ref='the Iraqi\'s weapons are to be handed over to the army within two weeks'.lower().split()
     #h='in two weeks Iraqi weapons will give army'.lower().split()
     #meteor_score(h,ref)
     
     for h1, h2, ref in islice(sentences(), opts.num_sentences):
-
+        
         h1_score = meteor_score(h1,ref)
         h2_score = meteor_score(h2,ref)
          
         print(-1 if h1_score > h2_score else # \begin{cases}
                 (0 if h1_score == h2_score
                     else 1)) # \end{cases}
- 
+          
 # convention to allow import of this file as a module
 if __name__ == '__main__':
     main()
