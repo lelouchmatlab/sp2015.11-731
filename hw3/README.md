@@ -1,3 +1,9 @@
+In mydecode.py I tried switch two adjacent translations based on the lm score. In each hypothesis object, I recored the starting and ending point of previous and current hypothesis. The final result is got by backtracking. This implementation gives some improvement but still far away from baseline.
+
+(Thanks for helpful discussion with Chucheng!) In mydecode3.py I tried to insert current translation into  previous translations as well as append it after previous translations. Here I store all translation up to current point in hypothesis object so the final result can just be read out from best hypothesis.
+
+
+
 There are three Python programs here (`-h` for usage):
 
  - `./decode` a simple non-reordering (monotone) phrase-based decoder
