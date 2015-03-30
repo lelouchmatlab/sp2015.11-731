@@ -50,7 +50,7 @@ for f in input_sents:
                 if f[i:j] in tm:
                     for phrase in tm[f[i:j]]:
                         tm_score = h.tm_score + phrase.logprob
-                        for k in xrange( max(0, len(h.translation)-3), len(h.translation) +1):
+                        for k in xrange( max(0, len(h.translation)-2), len(h.translation) +1):
                             new_translation = h.translation[:k] + [phrase.english] + h.translation[k:]
                             isEnd = False
                             if j==len(f):
@@ -66,6 +66,8 @@ for f in input_sents:
         return ' '.join(h.translation)
     print extract_english_recursive(winner)
 
+    
+    
     if opts.verbose:
         def extract_tm_logprob(h):
             return 0.0 if h.predecessor is None else h.phrase.logprob + extract_tm_logprob(h.predecessor)
