@@ -1,0 +1,139 @@
+#!/usr/bin/env python
+import sys
+import argparse
+import pickle
+import random
+from collections import defaultdict
+from utils import read_ttable
+
+def dot(w, v):
+	s = 0.0
+	for k in set(w.keys()) & set(v.keys()):
+		s += w[k] * v[k]
+	return s
+
+def update(line, target, translation_table, binary_feat_paramdict, log_feat_paramdict, gamma, lr):
+    left_context, phrase, right_context = [part.strip() for part in line.decode('utf-8').strip().split('|||')]
+    if len(left_context)==0:
+        previous_word = 'None'
+    else:
+        previous_word = left_context.strip().split()[-1]
+    if len(right_context)==0:
+        next_word = 'None'
+    else:
+        next_word = right_context.strip().split()[0]
+
+    ref_log_features = translation_table[phrase][target]
+    ref_binary_features_prev = 'src:'+phrase+'_tgt:'+target+'_prev:'+previous_word
+    ref_binary_features_next = 'src:'+phrase+'_tgt:'+target+'_next:'+next_word
+    
+    for trans_feature in translation_table[phrase].iteritems():
+        false_trans = trans_feature[0]
+        if false_trans  == target:
+            continue
+        else:
+            false_log_features = translation_table[phrase][false_trans]
+            false_binary_features_prev = 'src:'+phrase+'_tgt:'+false_trans+'_prev:'+previous_word
+            false_binary_features_next = 'src:'+phrase+'_tgt:'+false_trans+'_next:'+next_word
+        obj = gamma
+        #Handle 4 log probability features here
+        logdiff = defaultdict(float)
+        for key in log_feat_paramdict.keys():
+            logdiff[key]=ref_log_features[key]-false_log_features[key]
+            obj = obj - logdiff[key]*log_feat_paramdict[key]
+        #Handle sparse binary feature here
+        #obj = obj - binary_feat_paramdict[ref_binary_features_prev] - binary_feat_paramdict[ref_binary_features_next]
+        #obj = obj + binary_feat_paramdict[false_binary_features_prev] + binary_feat_paramdict[false_binary_features_next]
+        if obj <0:
+            continue
+        else:
+            for key in log_feat_paramdict.keys():
+                log_feat_paramdict[key] = log_feat_paramdict[key] - lr*(-logdiff[key])
+            #binary_feat_paramdict[ref_binary_features_prev] = binary_feat_paramdict[ref_binary_features_prev] + lr*1
+            #binary_feat_paramdict[ref_binary_features_next] = binary_feat_paramdict[ref_binary_features_next] + lr*1
+            #binary_feat_paramdict[false_binary_features_prev] = binary_feat_paramdict[false_binary_features_prev] - lr*1
+            #binary_feat_paramdict[false_binary_features_next] = binary_feat_paramdict[false_binary_features_next] - lr*1
+
+
+
+
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--inputfeature', '-ifeature', default='data/train.input')
+parser.add_argument('--inputlabel', '-ilabel', default='data/train.refs')
+parser.add_argument('--ttable', '-t', default='data/ttable')
+parser.add_argument('--gamma','-g',default=0.3)
+parser.add_argument('--lr','-lr',default=0.01)
+parser.add_argument('--iter','-iter',default=5)
+args = parser.parse_args()
+
+#translation_table = read_ttable(args.ttable)
+#weights = {'log_prob_tgs': 1.0}
+#
+#input_file = open(args.inputfeature)
+#label_file = open(args.inputlabel)
+#
+#train_input = input_file.readlines()
+#train_label = label_file.readlines()
+#
+#num_samples = len(train_input)
+#
+#init=lambda: 1.0/10
+#binary_feat_paramdict=defaultdict(float)
+#
+#log_feat_paramdict=defaultdict(float)
+#log_feat_paramdict['log_lex_prob_tgs']=1.0/10
+#log_feat_paramdict['log_prob_sgt']=1.0/10
+#log_feat_paramdict['log_lex_prob_sgt']=1.0/10
+#log_feat_paramdict['log_prob_tgs']=1.0/10
+#
+#print 'Initialize sparse binary feature...'
+#for i in xrange(0,num_samples):
+#    line = train_input[i].strip('\n')
+#    target = train_label[i].strip('\n')
+#    left_context, phrase, right_context = [part.strip() for part in line.decode('utf-8').strip().split('|||')]
+#    if len(left_context)==0:
+#        previous_word = 'None'
+#    else:
+#        previous_word = left_context.strip().split()[-1]
+#    
+#    if len(right_context)==0:
+#        next_word = 'None'
+#    else:
+#        next_word = right_context.strip().split()[0]
+#    for trans in translation_table[phrase].iteritems():
+#        feature = 'src:'+phrase+'_tgt:'+trans[0]+'_prev:'+previous_word
+#        binary_feat_paramdict[feature]=1.0/10
+#        feature = 'src:'+phrase+'_tgt:'+trans[0]+'_next:'+next_word
+#        binary_feat_paramdict[feature]=1.0/10
+
+print 'Start SGD training...'
+for j in xrange(4):
+    print 'Looping over data %d'%(j+1)
+    temp = list(zip(train_input,train_label))
+    random.shuffle(temp)
+    train_input,train_label = zip(*temp)
+    for i in xrange(0,num_samples):
+        line = train_input[i].strip('\n')
+        target = train_label[i].strip('\n').decode('utf-8')
+        update(line, target, translation_table, binary_feat_paramdict,log_feat_paramdict, args.gamma, args.lr)
+
+#
+
+with open('model.pickle', 'w') as f:
+    pickle.dump([binary_feat_paramdict, log_feat_paramdict],f)
+
+    #print '\n\n'
+
+    #previous_word = left_context.strip().split()[-1]
+    #next_word = right_context.strip().split()[-1]
+    
+    #print phrase,'|||',train_label[i].strip('\n'),'|||',previous_word,'|||',next_word
+
+
+#for line in open(args.input):
+#	left_context, phrase, right_context = [part.strip() for part in line.decode('utf-8').strip().split('|||')]
+#	candidates = [target for target, features in sorted(translation_table[phrase].iteritems(), key=lambda (t, f): dot(f, weights), reverse=True)]
+#	print ' ||| '.join(candidates).encode('utf-8')

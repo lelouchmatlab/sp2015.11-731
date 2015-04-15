@@ -1,0 +1,48 @@
+#!/usr/bin/env python
+import sys
+import argparse
+import pickle
+from collections import defaultdict
+from utils import read_ttable
+
+def dot(w, v):
+	s = 0.0
+	for k in set(w.keys()) & set(v.keys()):
+		s += w[k] * v[k]
+	return s
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--input', '-i', default='data/dev+test.input')
+parser.add_argument('--ttable', '-t', default='data/ttable')
+parser.add_argument('--modelfile','-m',default='./model.pickle')
+args = parser.parse_args()
+
+translation_table = read_ttable(args.ttable)
+with open(args.modelfile) as f:
+    param = pickle.load(f)
+    binary_feat_paramdict = param[0]
+    log_feat_paramdict = param[1]
+
+for line in open(args.input):
+    left_context, phrase, right_context = [part.strip() for part in line.decode('utf-8').strip().split('|||')]
+    candidates=[]
+    for target, features in translation_table[phrase].iteritems():
+        log_features = translation_table[phrase][target]
+        if len(left_context)==0:
+            previous_word = 'None'
+        else:
+            previous_word = left_context.strip().split()[-1]
+        if len(right_context)==0:
+            next_word = 'None'
+        else:
+            next_word = right_context.strip().split()[0]
+        binary_features_prev = 'src:'+phrase+'_tgt:'+target+'_prev:'+previous_word
+        binary_features_next = 'src:'+phrase+'_tgt:'+target+'_next:'+next_word
+        score = 0
+        for key in log_feat_paramdict.keys():
+            score = score + log_feat_paramdict[key]*log_features[key]
+        #score = score + binary_feat_paramdict[binary_features_prev]
+        #score = score + binary_feat_paramdict[binary_features_next]
+        candidates.append((target,score))
+    candidates= sorted(candidates,key=lambda x: x[1],reverse=True)
+    print ' ||| '.join([target for target,score in candidates]).encode('utf-8')
